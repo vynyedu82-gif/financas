@@ -242,6 +242,10 @@ border-radius:10px;font-size:14px;font-family:inherit;color:var(--t);background:
 <div class="sheet" id="sh-conta">
   <div class="sh"><button class="bk" onclick="fecha('sh-conta')">←</button><span class="t" id="ncT">Nova conta</span></div>
   <div class="sb">
+    <div class="lbl" style="padding-top:12px">ESSA CONTA É</div>
+    <div class="grid g2"><button class="chip on" id="ncTS" onclick="ncTipo('gasto')">− Uma saída</button>
+      <button class="chip" id="ncTG" onclick="ncTipo('ganho')">+ Uma entrada</button></div>
+    <div class="note" id="ncTNote"></div>
     <div class="fld" style="padding-top:12px"><label>NOME</label><input id="ncN" placeholder="Ex: Aluguel"></div>
     <div class="lbl" style="padding-top:0">CLASSE</div>
     <div class="grid g2"><button class="chip on" id="ncF" onclick="ncCl('fixa')">Fixa</button>
@@ -591,8 +595,9 @@ function telaHome(){
   el.innerHTML=`<div class="wel">
    <h2>Bem-vindos</h2>
    <p>O app está vazio. Pra ele funcionar, precisa saber quais contas vocês pagam e quais cartões usam.</p>
-   <p style="font-size:12.5px">Comece cadastrando uma conta. Leva um minuto e depois nunca mais.</p></div>
-   <button class="btn" onclick="novaConta()">Cadastrar primeira conta</button>
+   <p style="font-size:12.5px">Comece pelos salários — assim o saldo já nasce com sentido. Depois as contas.</p></div>
+   <button class="btn" onclick="novaEntrada()">Cadastrar um salário</button>
+   <button class="btn gh" onclick="novaConta()">Cadastrar uma conta</button>
    <button class="btn gh" onclick="novoCard()">Cadastrar um cartão</button>
    <div class="note" style="padding:14px 16px">Se preferir, dá pra carregar dados de exemplo pra experimentar antes — está em Mais › Dados.</div>`;
   return;
@@ -648,6 +653,7 @@ function telaHome(){
 function telaContas(){
  const el=document.getElementById('p-contas');
  const man=contasManuais().filter(c=>c.tipo!=='ganho');
+ const ent=contasManuais().filter(c=>c.tipo==='ganho');
  const fx=man.filter(c=>c.classe==='fixa'),vr=man.filter(c=>c.classe==='var');
  const ass=assinaturas(),vAss=ass.reduce((s,c)=>s+valorDoMes(c),0);
  if(!man.length&&!D.cartoes.length&&!ass.length){
@@ -675,6 +681,12 @@ function telaContas(){
  el.innerHTML=`
  <div style="padding:14px 16px 0"><div style="font-size:12px;color:var(--t2)">
   Falta pagar <b style="color:var(--r);font-size:14px">${brl(aindaSai())}</b></div></div>
+ ${ent.length?`<div class="lbl">ENTRADAS DO MÊS (${ent.length})</div><div class="sec">${ent.map(c=>
+  `<div class="row"><span class="dot" style="background:var(--g)"></span>
+   <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
+   <div class="m">dia ${c.dia}${c.fim?' · até '+c.fim:''}</div></div>
+   <input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
+    onchange="mudouValor('${c.id}',this.value)"></div>`).join('')}</div>`:''}
  ${fx.length?`<div class="lbl">FIXAS · confirma (${fx.length})</div><div class="sec">${fx.map(c=>lin(c,0)).join('')}</div>`:''}
  ${vr.length?`<div class="lbl">VARIÁVEIS · confere o valor (${vr.length})</div><div class="sec">${vr.map(c=>lin(c,1)).join('')}</div>`:''}
  ${ft?`<div class="lbl">FATURAS DE CARTÃO (${D.cartoes.length})</div><div class="sec">${ft}</div>`:''}
@@ -684,7 +696,8 @@ function telaContas(){
   <div style="font-size:10.5px;color:var(--p)">caem sozinhas, sem você confirmar</div></div>
   <div style="font-size:16px;color:var(--p)">›</div></div>`:''}
  <div class="note" style="padding:12px 16px">Pagar a fatura não cria gasto novo — as compras já foram contadas quando aconteceram.</div>
- <button class="btn gh" onclick="novaConta()">+ Nova conta</button>`;
+ <button class="btn gh" onclick="novaConta()">+ Nova conta</button>
+ <button class="btn gh" style="margin-top:0" onclick="novaEntrada()">+ Nova entrada (salário)</button>`;
 }
 
 function telaAnalise(){
@@ -1594,12 +1607,28 @@ function salvarReajuste(id){
 }
 
 /* cadastro de conta */
-let NC={id:null,classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};
-function novaConta(){NC={id:null,classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};abrirFormConta()}
-function novaAssinatura(){NC={id:null,classe:'fixa',auto:1,destino:D.cartoes[0]?D.cartoes[0].id:null,dur:'ind',durN:12};abrirFormConta()}
+let NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};
+function novaConta(){NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};abrirFormConta()}
+function novaEntrada(){NC={id:null,tipo:'ganho',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};abrirFormConta()}
+function ncTipo(t){
+ NC.tipo=t;
+ document.getElementById('ncTS').classList.toggle('on',t==='gasto');
+ document.getElementById('ncTG').classList.toggle('on',t==='ganho');
+ document.getElementById('ncTNote').textContent=t==='ganho'
+  ?'Salário, aposentadoria, aluguel que vocês recebem. Entra sozinho todo mês.'
+  :'Aluguel, luz, mensalidade. Aparece pra você confirmar o pagamento.';
+ const g=NC.tipo==='ganho';
+ ['ncA1','ncA0'].forEach(i=>{const e=document.getElementById(i);if(e)e.parentElement.style.display=g?'none':'grid'});
+ const an=document.getElementById('ncANote');if(an)an.style.display=g?'none':'block';
+ const lb=[...document.querySelectorAll('#sh-conta .lbl')].find(x=>x.textContent==='ELA CAI SOZINHA?');
+ if(lb)lb.style.display=g?'none':'block';
+ if(g){NC.auto=0}
+ dNC();
+}
+function novaAssinatura(){NC={id:null,tipo:'gasto',classe:'fixa',auto:1,destino:D.cartoes[0]?D.cartoes[0].id:null,dur:'ind',durN:12};abrirFormConta()}
 function editarConta(id){
  const c=D.contas.find(x=>x.id===id);if(!c)return;
- NC={id:c.id,classe:c.classe,auto:c.auto?1:0,destino:c.destino||null,
+ NC={id:c.id,tipo:c.tipo||'gasto',classe:c.classe,auto:c.auto?1:0,destino:c.destino||null,
   dur:c.dur==='ind'||!c.dur?'ind':'fix',durN:c.dur==='ind'?12:c.dur};
  abrirFormConta(c);
 }
@@ -1614,7 +1643,7 @@ function abrirFormConta(c){
  document.getElementById('ncIni').value=c?(c.inicio||''):mesAtual();
  document.getElementById('ncFim').value=c?(c.fim||''):'';
  document.getElementById('ncDel').style.display=c?'block':'none';
- ncCl(NC.classe);ncAuto(NC.auto);
+ ncCl(NC.classe);ncAuto(NC.auto);ncTipo(NC.tipo);
  abre('sh-conta');
 }
 function ncCl(x){NC.classe=x;
@@ -1656,7 +1685,7 @@ function salvarConta(){
  if(!/^\d{4}-\d{2}$/.test(ini))return tst('"Começou em" no formato AAAA-MM');
  if(fim&&!/^\d{4}-\d{2}$/.test(fim))return tst('"Termina em" no formato AAAA-MM');
  if(fim&&fim<ini)return tst('O fim não pode ser antes do começo');
- const obj={nome,valor,dia,classe:NC.classe,cat:document.getElementById('ncC').value,
+ const obj={nome,valor,dia,tipo:NC.tipo,classe:NC.classe,cat:document.getElementById('ncC').value,
   proj:document.getElementById('ncP').value||'',auto:!!NC.auto,
   destino:NC.auto?NC.destino:null,formaHab:NC.auto?null:(fh?fh.value:'Débito'),
   dur:NC.dur==='ind'?'ind':NC.durN,inicio:ini,fim:fim,ativa:true};
@@ -1669,7 +1698,7 @@ function salvarConta(){
   subir('contas',c);tst(nome+' atualizada');
  } else {
   obj.id=novoId();obj.valores=[{desde:ini,valor}];
-  D.contas.push(obj);subir('contas',obj);tst(NC.auto?'Assinatura criada':'Conta cadastrada');
+  D.contas.push(obj);subir('contas',obj);tst(NC.auto?'Assinatura criada':(NC.tipo==='ganho'?'Entrada cadastrada':'Conta cadastrada'));
  }
  salvar();fecha('sh-conta');render();
  if(NC.auto)go('assin');
