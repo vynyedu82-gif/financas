@@ -252,7 +252,7 @@ border-radius:10px;font-size:14px;font-family:inherit;color:var(--t);background:
       <button class="chip on" id="ncA0" onclick="ncAuto(0)">Não, eu pago</button></div>
     <div class="note" id="ncANote"></div>
     <div class="fr" style="padding-top:12px">
-      <div><label>VALOR</label><input id="ncVal" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+      <div><label>VALOR</label><input id="ncVal" type="text" inputmode="decimal" placeholder="0,00"></div>
       <div style="max-width:108px"><label>DIA</label><input id="ncD" type="number" min="1" max="31" inputmode="numeric" placeholder="10"></div></div>
     <div class="fr">
       <div><label>CATEGORIA</label><select id="ncC"></select></div>
@@ -336,6 +336,25 @@ const novoId=()=>'x'+(D.seq++)+'_'+Date.now().toString(36);
 /* ══════════════════════════════════════════════════════════
    3. UTILIDADES DE DATA E DINHEIRO
    ══════════════════════════════════════════════════════════ */
+/* aceita 1449,84 · 1449.84 · 1.449,84 · R$ 1.449,84 — sem perder centavo */
+function num(x){
+ if(typeof x==='number')return isFinite(x)?x:0;
+ if(x==null)return 0;
+ let s=String(x).trim().replace(/[R$\s]/gi,'');
+ if(!s)return 0;
+ const v=s.lastIndexOf(','),p=s.lastIndexOf('.');
+ if(v>-1&&p>-1){                       // tem os dois: o último manda
+  if(v>p)s=s.replace(/\./g,'').replace(',','.');
+  else s=s.replace(/,/g,'');
+ } else if(v>-1){                      // só vírgula
+  s=s.split(',').length>2?s.replace(/,/g,''):s.replace(',','.');
+ } else if(p>-1){                      // só ponto: 1.449 é milhar, 1.44 é decimal
+  const d=s.split('.');
+  if(d.length>2||d[1].length===3)s=s.replace(/\./g,'');
+ }
+ const n=parseFloat(s);
+ return isNaN(n)?0:n;
+}
 const brl=v=>'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const brl0=v=>'R$ '+Math.abs(Math.round(v)).toLocaleString('pt-BR');
 const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -639,7 +658,7 @@ function telaContas(){
    <button class="ck ${pgo?'on':''} ${late?'due':''}" onclick="darBaixa('${c.id}')"></button>
    <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
     <div class="m" ${late?'style="color:var(--r)"':''}>${pgo?'pago'+(baixa(c.id).forma?' · '+baixa(c.id).forma:''):(late?'venceu há '+(-d)+'d':'dia '+c.dia)}${c.proj?' · '+c.proj:''}</div></div>
-   ${!pgo?`<input class="vin" type="number" step="0.01" inputmode="decimal" value="${valorDoMes(c).toFixed(2)}"
+   ${!pgo?`<input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2)}"
      onchange="mudouValor('${c.id}',this.value)">`
     :`<div class="v">${brl(valorDoMes(c))}</div>`}</div>`};
  let ft='';
@@ -805,7 +824,7 @@ function baixaForma(id,forma){
     `<button class="chip" onclick="RL.card='${k.id}';document.querySelectorAll('#rlCards .chip').forEach(b=>b.classList.remove('on'));this.classList.add('on');rlCons()">${k.nome}</button>`).join('')}</div>`:''}
   <div class="lbl">QUANTO DE JURO</div>
   <div style="padding:0 16px"><input class="vin" style="width:100%;text-align:left" type="number"
-   step="0.01" inputmode="decimal" placeholder="0,00" oninput="RL.juros=parseFloat(this.value)||0;rlCons()"></div>
+   step="0.01" inputmode="decimal" placeholder="0,00" oninput="RL.juros=num(this.value);rlCons()"></div>
   <div class="note">O juro fica separado do gasto — a categoria ${c.cat} não é distorcida por ele.</div>
   <div class="note" id="rlC" style="padding-top:12px;font-size:12px;color:var(--t2)"></div>
   <button class="btn" onclick="confirmarRolagem('${c.id}','${esc(forma)}')">Confirmar</button>`;
@@ -830,11 +849,11 @@ function confirmarRolagem(id,forma){
  salvar();fecha('sh-gen');render();
  tst(c.nome+' rolado · custa '+brl(v+RL.juros)+' em '+MESES[d.m].slice(0,3));
 }
-function ajustar(id,v){setAjuste(D.contas.find(x=>x.id===id),parseFloat(v)||0);salvar();render()}
+function ajustar(id,v){setAjuste(D.contas.find(x=>x.id===id),num(v));salvar();render()}
 
 /* editar o valor: variável muda só o mês, fixa pergunta se é reajuste */
 function mudouValor(id,v){
- const c=D.contas.find(x=>x.id===id),novo=parseFloat(v)||0;
+ const c=D.contas.find(x=>x.id===id),novo=num(v);
  const antes=valorEm(c,anoAtivo,mesAtivo);
  if(c.classe!=='fixa'){setAjuste(c,novo);salvar();render();return}
  if(novo===antes){render();return}
@@ -995,14 +1014,14 @@ function dFull(){
  const jf=Fx.forma==='Pix c/ juros'||Fx.forma==='Empréstimo',jp=Fx.forma==='Crédito'&&Fx.parc>=2;
  let jh='';
  if(jf)jh=`<div class="lbl">QUANTO DE JURO</div><div style="padding:0 16px">
-  <input class="vin" style="width:100%;text-align:left" type="number" step="0.01" inputmode="decimal"
-  placeholder="0,00" value="${Fx.juros||''}" oninput="Fx.juros=parseFloat(this.value)||0;consFull()"></div>`;
+  <input class="vin" style="width:100%;text-align:left" type="text" inputmode="decimal"
+  placeholder="0,00" value="${Fx.juros||''}" oninput="Fx.juros=num(this.value);consFull()"></div>`;
  else if(jp){
   jh=`<div class="lbl">ESSE PARCELAMENTO TEM JUROS?</div><div class="grid g2">
    <button class="chip ${Fx.temJ===true?'on':''}" onclick="Fx.temJ=true;dFull()">Sim, tem juros</button>
    <button class="chip ${Fx.temJ===false?'on':''}" onclick="Fx.temJ=false;Fx.juros=0;Fx.vParc=0;dFull()">Não, sem juros</button></div>`;
   if(Fx.temJ)jh+=`<div class="lbl">VALOR DE CADA PARCELA</div><div style="padding:0 16px">
-   <input class="vin" style="width:100%;text-align:left" type="number" step="0.01" inputmode="decimal"
+   <input class="vin" style="width:100%;text-align:left" type="text" inputmode="decimal"
    placeholder="o que aparece na maquininha" value="${Fx.vParc||''}" oninput="setVParc(this.value)"></div>
    <div class="note">O preço à vista você já digitou. Aqui vai a parcela — o app calcula o juro.</div>`;
  }
@@ -1010,7 +1029,7 @@ function dFull(){
  consFull();
 }
 function setVParc(x){
- Fx.vParc=parseFloat(x)||0;
+ Fx.vParc=num(x);
  const v=val?parseInt(val)/100:0;
  Fx.juros=Math.max(0,Fx.vParc*Fx.parc-v);
  consFull();
@@ -1541,7 +1560,7 @@ function reajustarConta(id){
   <div class="hero" style="background:var(--s1)"><div class="k" style="color:var(--t3)">VALOR ATUAL</div>
    <div class="v">${brl(atual)}</div></div>
   <div class="fld" style="padding-top:14px"><label>NOVO VALOR</label>
-   <input id="rjV" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+   <input id="rjV" type="text" inputmode="decimal" placeholder="0,00"></div>
   <div class="fld"><label>VALENDO A PARTIR DE</label><input id="rjD" placeholder="AAAA-MM" value="${mesAtual()}"></div>
   <div class="note">Os meses anteriores continuam com o valor antigo. É assim que o histórico fica honesto.</div>
   <button class="btn" onclick="salvarReajuste('${c.id}')">Aplicar reajuste</button>`;
@@ -1549,7 +1568,7 @@ function reajustarConta(id){
 }
 function salvarReajuste(id){
  const c=D.contas.find(x=>x.id===id);
- const v=parseFloat(document.getElementById('rjV').value)||0;
+ const v=num(document.getElementById('rjV').value);
  const d=document.getElementById('rjD').value.trim();
  if(v<=0)return tst('Informe o novo valor');
  if(!/^\d{4}-\d{2}$/.test(d))return tst('Data no formato AAAA-MM');
@@ -1612,7 +1631,7 @@ function dNC(){
 function salvarConta(){
  const nome=document.getElementById('ncN').value.trim();
  if(!nome)return tst('Informe o nome');
- const valor=parseFloat(document.getElementById('ncVal').value)||0;
+ const valor=num(document.getElementById('ncVal').value);
  const dia=Math.min(31,Math.max(1,parseInt(document.getElementById('ncD').value)||1));
  const fh=document.getElementById('ncFH');
  let ini=document.getElementById('ncIni').value.trim()||mesAtual();
@@ -1666,7 +1685,7 @@ function salvarCard(){
  const obj={nome,dono:document.getElementById('nkO').value,
   fecha:parseInt(document.getElementById('nkF').value)||1,
   venc:parseInt(document.getElementById('nkV').value)||10,
-  limite:parseFloat(document.getElementById('nkL').value)||0};
+  limite:num(document.getElementById('nkL').value)};
  if(NK.id){const k=D.cartoes.find(x=>x.id===NK.id);Object.assign(k,obj);subir('cartoes',k)}
  else{obj.id=novoId();D.cartoes.push(obj);subir('cartoes',obj)}
  salvar();fecha('sh-card');render();tst('Cartão salvo');
@@ -1716,7 +1735,7 @@ function criarAtalho(t,cat,forma,card,quem){
 function novoAporte(){
  document.getElementById('genT').textContent='Registrar aporte';
  document.getElementById('genB').innerHTML=`
-  <div class="fld" style="padding-top:12px"><label>VALOR</label><input id="apV" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+  <div class="fld" style="padding-top:12px"><label>VALOR</label><input id="apV" type="text" inputmode="decimal" placeholder="0,00"></div>
   <div class="lbl">PRAZO</div><div class="grid g2" id="apP">${PRAZOS.map((p,i)=>
    `<button class="chip ${i===0?'on':''}" onclick="AP.prazo='${p}';document.querySelectorAll('#apP .chip').forEach(b=>b.classList.remove('on'));this.classList.add('on')">${p}</button>`).join('')}</div>
   <div class="fld" style="padding-top:12px"><label>TIPO</label><select id="apT">${TIPOS_INV.map(t=>`<option>${t}</option>`).join('')}</select></div>
@@ -1727,7 +1746,7 @@ function novoAporte(){
 }
 let AP={};
 function salvarAporte(){
- const v=parseFloat(document.getElementById('apV').value)||0;
+ const v=num(document.getElementById('apV').value);
  if(v<=0)return tst('Informe o valor');
  const ap={id:novoId(),data:document.getElementById('apD').value||hojeISO(),
   prazo:AP.prazo,tipo:document.getElementById('apT').value,
@@ -1742,7 +1761,7 @@ function novoBem(){
    <button class="chip on" onclick="BM.tipo='bem';document.querySelectorAll('#bmT .chip').forEach(b=>b.classList.remove('on'));this.classList.add('on')">Um bem</button>
    <button class="chip" onclick="BM.tipo='divida';document.querySelectorAll('#bmT .chip').forEach(b=>b.classList.remove('on'));this.classList.add('on')">Uma dívida</button></div>
   <div class="fld" style="padding-top:12px"><label>NOME</label><input id="bmN" placeholder="Apartamento, Financiamento..."></div>
-  <div class="fld"><label>VALOR HOJE</label><input id="bmV" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+  <div class="fld"><label>VALOR HOJE</label><input id="bmV" type="text" inputmode="decimal" placeholder="0,00"></div>
   <div class="fld"><label>OBSERVAÇÃO</label><input id="bmO" placeholder="opcional"></div>
   <button class="btn" onclick="salvarBem()">Salvar</button>`;
  BM={tipo:'bem'};abre('sh-gen');
@@ -1750,7 +1769,7 @@ function novoBem(){
 let BM={};
 function salvarBem(){
  const n=document.getElementById('bmN').value.trim();
- const v=parseFloat(document.getElementById('bmV').value)||0;
+ const v=num(document.getElementById('bmV').value);
  if(!n)return tst('Informe o nome');
  if(BM.id){const b=D.bens.find(x=>x.id===BM.id);Object.assign(b,{nome:n,valor:v,tipo:BM.tipo,sub:document.getElementById('bmO').value.trim()});subir('bens',b)}
  else{const nb={id:novoId(),nome:n,valor:v,tipo:BM.tipo,sub:document.getElementById('bmO').value.trim()};D.bens.push(nb);subir('bens',nb)}
