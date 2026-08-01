@@ -616,7 +616,7 @@ function telaHome(){
    <div class="g"><div class="n">${l.cat}</div>
    <div class="m">${gan?l.quem:(l.forma||'')}${l.cartao?' · '+nomeCard(l.cartao):''} · ${fmtData(l.data)}${l.juros?' · juro '+brl(l.juros):''}</div></div>
    <div class="v ${gan?'pos':'neg'}">${gan?'+':'−'} ${brl(l.valor)}</div></div>`});
- const bkp=diasSemBackup();
+ const bkp=precisaBackup();
  const venc2=contasVencendo().filter(x=>!x.c.encerrada);
  let av='';
  venc2.forEach(({c,fim,passou})=>{
@@ -640,7 +640,9 @@ function telaHome(){
   <div><div class="k">GUARDAR</div><div class="v pur">${brl0(metaGuardar())}</div></div></div>
  ${vh?`<div class="lbl">VENCE EM BREVE</div><div class="sec">${vh}</div>`:''}
  ${lh?`<div class="lbl">ÚLTIMOS LANÇAMENTOS</div><div class="sec">${lh}</div>`:'<div class="empty">Nenhum lançamento em '+MESES[mesAtivo]+'</div>'}
- ${bkp>=7?`<div class="warn"><div class="x">Faz ${bkp} dias que você não faz backup</div><b onclick="exportar()">Exportar</b></div>`:''}`;
+ ${bkp?`<div class="warn"><div class="x">${bkp==='nunca'
+   ?'Você ainda não guardou nenhum backup deste app'
+   :'Faz '+bkp+' dias que você não faz backup'}</div><b onclick="exportar()">Exportar</b></div>`:''}`;
 }
 
 function telaContas(){
@@ -783,9 +785,23 @@ function tst(m,u){
  t.classList.add('on');clearTimeout(tmr);tmr=setTimeout(()=>t.classList.remove('on'),u?5000:2300);
 }
 const nomeCard=id=>(D.cartoes.find(k=>k.id===id)||{}).nome||'';
+/* null = nunca exportou. Número = dias desde o último. */
 function diasSemBackup(){
- if(!D.ultimoBackup)return 99;
+ if(!D.ultimoBackup)return null;
  return Math.floor((Date.now()-new Date(D.ultimoBackup))/86400000);
+}
+/* dias desde que o app passou a ter algo que valha proteger */
+function diasComDados(){
+ if(!D.criado)return 0;
+ if(!D.contas.length&&!D.lanc.length&&!D.cartoes.length)return 0;
+ return Math.floor((Date.now()-new Date(D.criado))/86400000);
+}
+/* só cobra backup quando existe dado e já passou tempo suficiente */
+function precisaBackup(){
+ const d=diasSemBackup();
+ if(!diasComDados()&&!D.lanc.length&&!D.contas.length)return null;
+ if(d===null)return diasComDados()>=3?'nunca':null;
+ return d>=7?d:null;
 }
 
 /* baixa de conta — R12: sempre pergunta a forma */
@@ -1345,12 +1361,13 @@ function tirarProj(p){if(!confirm('Remover o projeto "'+p+'"?'))return;
  D.projetos=D.projetos.filter(x=>x!==p);salvar();render()}
 
 function telaDados(){
- const bkp=diasSemBackup();
+ const bkp=diasSemBackup(),cobra=precisaBackup();
  document.getElementById('p-dados').innerHTML=`
- <div class="card" style="background:${bkp>=7?'var(--bl)':'var(--s1)'}">
+ <div class="card" style="background:${cobra?'var(--bl)':'var(--s1)'}">
   <div style="font-size:13px;font-weight:600">Backup</div>
   <div style="font-size:11.5px;color:var(--t2);margin-top:3px">
-   ${D.ultimoBackup?'Último em '+fmtData(D.ultimoBackup.slice(0,10))+' · '+bkp+' dias atrás':'Nunca exportado'}</div>
+   ${bkp===null?'Nunca exportado'
+    :(bkp===0?'Exportado hoje':'Último em '+fmtData(D.ultimoBackup.slice(0,10))+' · '+(bkp===1?'ontem':'há '+bkp+' dias'))}</div>
   <button class="btn" style="width:100%;margin:10px 0 0" onclick="exportar()">Exportar agora</button></div>
  <div class="note" style="padding:0 16px 8px">O arquivo baixa pro seu aparelho. Guarde no Drive — é a cópia que sobrevive a qualquer coisa.</div>
  <div class="lbl">RESTAURAR</div>
