@@ -241,34 +241,7 @@ border-radius:10px;font-size:14px;font-family:inherit;color:var(--t);background:
 
 <div class="sheet" id="sh-conta">
   <div class="sh"><button class="bk" onclick="fecha('sh-conta')">←</button><span class="t" id="ncT">Nova conta</span></div>
-  <div class="sb">
-    <div class="lbl" style="padding-top:12px">ESSA CONTA É</div>
-    <div class="grid g2"><button class="chip on" id="ncTS" onclick="ncTipo('gasto')">− Uma saída</button>
-      <button class="chip" id="ncTG" onclick="ncTipo('ganho')">+ Uma entrada</button></div>
-    <div class="note" id="ncTNote"></div>
-    <div class="fld" style="padding-top:12px"><label>NOME</label><input id="ncN" placeholder="Ex: Aluguel"></div>
-    <div class="lbl" style="padding-top:0">CLASSE</div>
-    <div class="grid g2"><button class="chip on" id="ncF" onclick="ncCl('fixa')">Fixa</button>
-      <button class="chip" id="ncV" onclick="ncCl('var')">Variável</button></div>
-    <div class="note">Fixa: valor igual todo mês. Variável: o app usa a média.</div>
-    <div class="lbl">ELA CAI SOZINHA?</div>
-    <div class="grid g2"><button class="chip" id="ncA1" onclick="ncAuto(1)">Sim, automática</button>
-      <button class="chip on" id="ncA0" onclick="ncAuto(0)">Não, eu pago</button></div>
-    <div class="note" id="ncANote"></div>
-    <div class="fr" style="padding-top:12px">
-      <div><label>VALOR</label><input id="ncVal" type="text" inputmode="decimal" placeholder="0,00"></div>
-      <div style="max-width:108px"><label>DIA</label><input id="ncD" type="number" min="1" max="31" inputmode="numeric" placeholder="10"></div></div>
-    <div class="fr">
-      <div><label>CATEGORIA</label><select id="ncC"></select></div>
-      <div><label>PROJETO</label><select id="ncP"></select></div></div>
-    <div id="ncDest"></div>
-    <div class="fr"><div><label>COMEÇOU EM</label><input id="ncIni" placeholder="AAAA-MM"></div>
-      <div><label>TERMINA EM</label><input id="ncFim" placeholder="sem prazo"></div></div>
-    <div class="note">Ponha quando ela começou de verdade, mesmo que anos atrás — é assim que o app calcula quanto vocês já pagaram.</div>
-    <div id="ncDur"></div>
-    <button class="btn" onclick="salvarConta()">Salvar</button>
-    <button class="btn dz" id="ncDel" style="display:none" onclick="excluirConta()">Excluir</button>
-  </div>
+  <div class="sb" id="ncForm"></div>
 </div>
 
 <div class="sheet" id="sh-card">
@@ -301,6 +274,7 @@ const FONTES=['Salário','Freelance','Reembolso','PLR','13º salário','Férias'
 'Venda','Aluguel recebido','Rendimento','Outros'];
 const EXTRAORD=['PLR','13º salário','Férias','Comissão'];
 const PRAZOS=['Emergência','Curto','Médio','Longo'];
+const FONTES_FIXAS=['Salário','Aposentadoria','Pensão','Pró-labore','Aluguel recebido','Bolsa','Outra renda'];
 const TIPOS_INV=['Poupança','CDB','Tesouro Direto','LCI/LCA','Debêntures','Ações','Fundo imobiliário',
 'ETF','Fundos','PGBL','VGBL','Consórcio','Imóvel','Ouro','Criptomoeda','Outro'];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -666,7 +640,7 @@ function telaContas(){
    <button class="ck ${pgo?'on':''} ${late?'due':''}" onclick="darBaixa('${c.id}')"></button>
    <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
     <div class="m" ${late?'style="color:var(--r)"':''}>${pgo?'pago'+(baixa(c.id).forma?' · '+baixa(c.id).forma:''):(late?'venceu há '+(-d)+'d':'dia '+c.dia)}${c.proj?' · '+c.proj:''}</div></div>
-   ${!pgo?`<input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2)}"
+   ${!pgo?`<input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
      onchange="mudouValor('${c.id}',this.value)">`
     :`<div class="v">${brl(valorDoMes(c))}</div>`}</div>`};
  let ft='';
@@ -684,7 +658,7 @@ function telaContas(){
  ${ent.length?`<div class="lbl">ENTRADAS DO MÊS (${ent.length})</div><div class="sec">${ent.map(c=>
   `<div class="row"><span class="dot" style="background:var(--g)"></span>
    <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
-   <div class="m">dia ${c.dia}${c.fim?' · até '+c.fim:''}</div></div>
+   <div class="m">${c.quem||''}${c.cat?' · '+c.cat:''} · cai dia ${c.dia}</div></div>
    <input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
     onchange="mudouValor('${c.id}',this.value)"></div>`).join('')}</div>`:''}
  ${fx.length?`<div class="lbl">FIXAS · confirma (${fx.length})</div><div class="sec">${fx.map(c=>lin(c,0)).join('')}</div>`:''}
@@ -1564,12 +1538,13 @@ function verConta(id){
   <div class="hero" style="background:var(--s1)">
    <div class="k" style="color:var(--t3)">VALOR HOJE</div>
    <div class="v">${brl(valorEm(c,anoAtivo,mesAtivo))}</div>
-   <div class="s">${c.classe==='fixa'?'conta fixa':'conta variável'} · vence dia ${c.dia}</div></div>
+   <div class="s">${c.tipo==='ganho'?'entrada · cai dia '+c.dia:(c.classe==='fixa'?'conta fixa':'conta variável')+' · vence dia '+c.dia}</div></div>
   ${vr?`<div class="card" style="background:var(--al)">
    <div style="font-size:12px;color:#5c3a06">Desde ${MESES[parseInt(vr.desde.split('-')[1])-1].toLowerCase()} de ${vr.desde.split('-')[0]},
    subiu de <b>${brl(vr.de)}</b> para <b>${brl(vr.para)}</b> — <b>${vr.pct>0?'+':''}${vr.pct.toFixed(1)}%</b></div></div>`:''}
   <div class="sec" style="padding-top:6px">
-   <div class="row"><div class="g"><div class="n">Categoria</div></div><div class="v">${c.cat}</div></div>
+   <div class="row"><div class="g"><div class="n">${c.tipo==='ganho'?'De onde vem':'Categoria'}</div></div><div class="v">${c.cat}</div></div>
+   ${c.tipo==='ganho'&&c.quem?`<div class="row"><div class="g"><div class="n">De quem é</div></div><div class="v">${c.quem}</div></div>`:''}
    ${c.proj?`<div class="row"><div class="g"><div class="n">Projeto</div></div><div class="v">${c.proj}</div></div>`:''}
    <div class="row"><div class="g"><div class="n">Começou em</div></div><div class="v">${MESES[im-1]} ${ia}</div></div>
    <div class="row"><div class="g"><div class="n">Termina em</div>${c.fim?'':'<div class="m">sem prazo definido</div>'}</div>
@@ -1607,72 +1582,110 @@ function salvarReajuste(id){
 }
 
 /* cadastro de conta */
-let NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};
-function novaConta(){NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};abrirFormConta()}
-function novaEntrada(){NC={id:null,tipo:'ganho',classe:'fixa',auto:0,destino:null,dur:'ind',durN:12};abrirFormConta()}
-function ncTipo(t){
- NC.tipo=t;
- document.getElementById('ncTS').classList.toggle('on',t==='gasto');
- document.getElementById('ncTG').classList.toggle('on',t==='ganho');
- document.getElementById('ncTNote').textContent=t==='ganho'
-  ?'Salário, aposentadoria, aluguel que vocês recebem. Entra sozinho todo mês.'
-  :'Aluguel, luz, mensalidade. Aparece pra você confirmar o pagamento.';
- const g=NC.tipo==='ganho';
- ['ncA1','ncA0'].forEach(i=>{const e=document.getElementById(i);if(e)e.parentElement.style.display=g?'none':'grid'});
- const an=document.getElementById('ncANote');if(an)an.style.display=g?'none':'block';
- const lb=[...document.querySelectorAll('#sh-conta .lbl')].find(x=>x.textContent==='ELA CAI SOZINHA?');
- if(lb)lb.style.display=g?'none':'block';
- if(g){NC.auto=0}
- dNC();
-}
-function novaAssinatura(){NC={id:null,tipo:'gasto',classe:'fixa',auto:1,destino:D.cartoes[0]?D.cartoes[0].id:null,dur:'ind',durN:12};abrirFormConta()}
+let NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,quem:'Vinicius',c:null,f:null};
+function novaConta(){NC={id:null,tipo:'gasto',classe:'fixa',auto:0,destino:null,quem:'Vinicius',c:null,f:null};abrirFormConta()}
+function novaEntrada(){NC={id:null,tipo:'ganho',classe:'fixa',auto:0,destino:null,quem:'Vinicius',c:null,f:null};abrirFormConta()}
+function novaAssinatura(){NC={id:null,tipo:'gasto',classe:'fixa',auto:1,destino:D.cartoes[0]?D.cartoes[0].id:null,quem:'Vinicius',c:null,f:null};abrirFormConta()}
 function editarConta(id){
  const c=D.contas.find(x=>x.id===id);if(!c)return;
  NC={id:c.id,tipo:c.tipo||'gasto',classe:c.classe,auto:c.auto?1:0,destino:c.destino||null,
-  dur:c.dur==='ind'||!c.dur?'ind':'fix',durN:c.dur==='ind'?12:c.dur};
+  quem:c.quem||'Vinicius',c:c,f:null};
  abrirFormConta(c);
 }
 function abrirFormConta(c){
- document.getElementById('ncT').textContent=c?'Editar conta':(NC.auto?'Nova assinatura':'Nova conta');
- document.getElementById('ncN').value=c?c.nome:'';
- document.getElementById('ncVal').value=c?c.valor:'';
- document.getElementById('ncD').value=c?c.dia:'';
- document.getElementById('ncC').innerHTML=todasCats().map(x=>`<option ${c&&c.cat===x?'selected':''}>${x}</option>`).join('');
- document.getElementById('ncP').innerHTML='<option value="">nenhum</option>'+
-  D.projetos.map(p=>`<option ${c&&c.proj===p?'selected':''}>${p}</option>`).join('');
- document.getElementById('ncIni').value=c?(c.inicio||''):mesAtual();
- document.getElementById('ncFim').value=c?(c.fim||''):'';
- document.getElementById('ncDel').style.display=c?'block':'none';
- ncCl(NC.classe);ncAuto(NC.auto);ncTipo(NC.tipo);
+ NC.c=c||null;
+ document.getElementById('ncT').textContent=c?(NC.tipo==='ganho'?'Editar entrada':'Editar conta')
+  :(NC.auto?'Nova assinatura':(NC.tipo==='ganho'?'Nova entrada':'Nova conta'));
+ dForm();
  abre('sh-conta');
 }
-function ncCl(x){NC.classe=x;
- document.getElementById('ncF').classList.toggle('on',x==='fixa');
- document.getElementById('ncV').classList.toggle('on',x==='var')}
-function ncAuto(a){
- NC.auto=a?1:0;
- document.getElementById('ncA1').classList.toggle('on',!!a);
- document.getElementById('ncA0').classList.toggle('on',!a);
- document.getElementById('ncANote').textContent=a
-  ?'Não aparece em contas a pagar — você não faz nada. Cai direto no destino.'
-  :'Vai aparecer em contas a pagar e você confirma todo mês.';
- dNC();
+function ncTipo(t){NC.tipo=t;if(t==='ganho')NC.auto=0;dForm()}
+function ncCl(x){NC.classe=x;dForm()}
+function ncAuto(a){NC.auto=a?1:0;dForm()}
+function ncSetDest(d){NC.destino=d;dForm()}
+function ncQuem(q){NC.quem=q;dForm()}
+function guardaForm(){
+ const g=id=>{const e=document.getElementById(id);return e?e.value:undefined};
+ const v=x=>x===undefined?undefined:x;
+ NC.f={nome:v(g('ncN')),valor:v(g('ncVal')),dia:v(g('ncD')),cat:v(g('ncC')),
+  proj:v(g('ncP')),fh:v(g('ncFH')),ini:v(g('ncIni')),fim:v(g('ncFim'))};
 }
-function dNC(){
- document.getElementById('ncDest').innerHTML=NC.auto?
-  `<div class="lbl">ONDE CAI</div><div class="grid g3">${D.cartoes.map(k=>
-   `<button class="chip ${NC.destino===k.id?'on':''}" onclick="NC.destino='${k.id}';dNC()">${k.nome}</button>`).join('')}
-   <button class="chip ${!NC.destino?'on':''}" onclick="NC.destino=null;dNC()">Débito em conta</button></div>`
-  :`<div class="fld" style="padding-top:11px"><label>FORMA HABITUAL</label>
-    <select id="ncFH">${FORMAS.map(f=>`<option>${f}</option>`).join('')}</select></div>
-    <div class="note">Só uma sugestão. Toda baixa pergunta de novo.</div>`;
- document.getElementById('ncDur').innerHTML=`<div class="lbl">POR QUANTO TEMPO</div><div class="grid g2">
-  <button class="chip ${NC.dur==='ind'?'on':''}" onclick="NC.dur='ind';dNC()">Indeterminado</button>
-  <button class="chip ${NC.dur!=='ind'?'on':''}" onclick="NC.dur='fix';dNC()">Prazo definido</button></div>
-  ${NC.dur==='ind'?'<div class="note">Vai caindo todo mês até você desligar.</div>'
-   :`<div class="fld" style="padding-top:11px"><label>QUANTOS MESES</label>
-     <input type="number" min="1" inputmode="numeric" value="${NC.durN}" oninput="NC.durN=parseInt(this.value)||12"></div>
-     <div class="note">Depois disso ela se desliga sozinha.</div>`}`;
+function dForm(){
+ guardaForm();
+ const c=NC.c,f=NC.f||{},g=NC.tipo==='ganho';
+ const val=k=>f[k]!==undefined?f[k]:'';
+ const nome=f.nome!==undefined?f.nome:(c?c.nome:'');
+ const valor=f.valor!==undefined?f.valor:(c?String(c.valor).replace('.',','):'');
+ const dia=f.dia!==undefined?f.dia:(c?c.dia:'');
+ const ini=f.ini!==undefined?f.ini:(c?(c.inicio||''):mesAtual());
+ const fim=f.fim!==undefined?f.fim:(c?(c.fim||''):'');
+ const catAtual=f.cat!==undefined?f.cat:(c?c.cat:'');
+ const projAtual=f.proj!==undefined?f.proj:(c?(c.proj||''):'');
+ const fhAtual=f.fh!==undefined?f.fh:(c?(c.formaHab||'Débito'):'Débito');
+ if(!NC.quem)NC.quem=c&&c.quem?c.quem:'Vinicius';
+ const listaCat=g?FONTES_FIXAS:todasCats();
+
+ document.getElementById('ncForm').innerHTML=`
+ <div class="lbl" style="padding-top:12px">ESSA CONTA É</div>
+ <div class="grid g2">
+  <button class="chip ${!g?'on':''}" onclick="ncTipo('gasto')">− Uma saída</button>
+  <button class="chip ${g?'on':''}" onclick="ncTipo('ganho')">+ Uma entrada</button></div>
+ <div class="note">${g?'Salário, aposentadoria, aluguel que vocês recebem. Entra sozinho todo mês.'
+  :'Aluguel, luz, mensalidade. Aparece pra você confirmar o pagamento.'}</div>
+
+ <div class="fld" style="padding-top:12px"><label>NOME</label>
+  <input id="ncN" value="${esc(nome)}" placeholder="${g?'Ex: Salário Vinicius':'Ex: Aluguel'}" oninput="guardaForm()"></div>
+
+ ${g?`
+ <div class="lbl" style="padding-top:0">DE QUEM É</div>
+ <div class="grid g3">${['Vinicius','Tânia','Casal'].map(q=>
+  `<button class="chip ${NC.quem===q?'on':''}" onclick="ncQuem('${q}')">${q}</button>`).join('')}</div>
+ <div class="note">Aparece separado na análise, pra vocês verem quanto cada um traz.</div>
+ <div class="fld" style="padding-top:12px"><label>DE ONDE VEM</label>
+  <select id="ncC" onchange="guardaForm()">${listaCat.map(x=>
+   `<option ${catAtual===x?'selected':''}>${x}</option>`).join('')}</select></div>`
+ :`
+ <div class="lbl" style="padding-top:0">CLASSE</div>
+ <div class="grid g2">
+  <button class="chip ${NC.classe==='fixa'?'on':''}" onclick="ncCl('fixa')">Fixa</button>
+  <button class="chip ${NC.classe==='var'?'on':''}" onclick="ncCl('var')">Variável</button></div>
+ <div class="note">Fixa: valor igual todo mês. Variável: muda sempre, o app usa a média.</div>
+ <div class="lbl">ELA CAI SOZINHA?</div>
+ <div class="grid g2">
+  <button class="chip ${NC.auto?'on':''}" onclick="ncAuto(1)">Sim, automática</button>
+  <button class="chip ${!NC.auto?'on':''}" onclick="ncAuto(0)">Não, eu pago</button></div>
+ <div class="note">${NC.auto?'Não aparece em contas a pagar — cai direto no destino.'
+   :'Vai aparecer em contas a pagar e você confirma todo mês.'}</div>`}
+
+ <div class="fr" style="padding-top:12px">
+  <div><label>VALOR</label><input id="ncVal" type="text" inputmode="decimal"
+   value="${esc(valor)}" placeholder="0,00" oninput="guardaForm()"></div>
+  <div style="max-width:112px"><label>${g?'CAI DIA':'VENCE DIA'}</label>
+   <input id="ncD" type="number" min="1" max="31" inputmode="numeric" value="${dia}" placeholder="5" oninput="guardaForm()"></div></div>
+
+ ${g?'':`
+ <div class="fr">
+  <div><label>CATEGORIA</label><select id="ncC" onchange="guardaForm()">${listaCat.map(x=>
+   `<option ${catAtual===x?'selected':''}>${x}</option>`).join('')}</select></div>
+  <div><label>PROJETO</label><select id="ncP" onchange="guardaForm()">
+   <option value="">nenhum</option>${D.projetos.map(x=>
+   `<option ${projAtual===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+ ${NC.auto?`<div class="lbl">ONDE CAI</div><div class="grid g3">${D.cartoes.map(k=>
+   `<button class="chip ${NC.destino===k.id?'on':''}" onclick="ncSetDest('${k.id}')">${k.nome}</button>`).join('')}
+   <button class="chip ${!NC.destino?'on':''}" onclick="ncSetDest(null)">Débito em conta</button></div>
+   ${D.cartoes.length?'':'<div class="note">Cadastre um cartão antes, se ela cai em cartão.</div>'}`
+  :`<div class="fld"><label>FORMA HABITUAL</label><select id="ncFH" onchange="guardaForm()">${FORMAS.map(x=>
+    `<option ${fhAtual===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="note">Só uma sugestão. Toda baixa pergunta de novo.</div>`}`}
+
+ <div class="fr" style="padding-top:12px">
+  <div><label>COMEÇOU EM</label><input id="ncIni" value="${esc(ini)}" placeholder="AAAA-MM" oninput="guardaForm()"></div>
+  <div><label>ATÉ QUANDO</label><input id="ncFim" value="${esc(fim)}" placeholder="sem prazo" oninput="guardaForm()"></div></div>
+ <div class="note">${g?'Se o emprego começou anos atrás, ponha a data real. "Até quando" só se tiver fim previsto.'
+  :'Ponha quando ela começou de verdade, mesmo que anos atrás — é assim que o app calcula quanto vocês já pagaram.\nDeixe "até quando" vazio se não tem fim previsto.'}</div>
+
+ <button class="btn" onclick="salvarConta()">Salvar</button>
+ ${c?`<button class="btn dz" onclick="excluirConta()">Excluir</button>`:''}`;
 }
 function salvarConta(){
  const nome=document.getElementById('ncN').value.trim();
@@ -1680,15 +1693,18 @@ function salvarConta(){
  const valor=num(document.getElementById('ncVal').value);
  const dia=Math.min(31,Math.max(1,parseInt(document.getElementById('ncD').value)||1));
  const fh=document.getElementById('ncFH');
+ const g=NC.tipo==='ganho';
  let ini=document.getElementById('ncIni').value.trim()||mesAtual();
  let fim=document.getElementById('ncFim').value.trim()||null;
  if(!/^\d{4}-\d{2}$/.test(ini))return tst('"Começou em" no formato AAAA-MM');
  if(fim&&!/^\d{4}-\d{2}$/.test(fim))return tst('"Termina em" no formato AAAA-MM');
  if(fim&&fim<ini)return tst('O fim não pode ser antes do começo');
- const obj={nome,valor,dia,tipo:NC.tipo,classe:NC.classe,cat:document.getElementById('ncC').value,
-  proj:document.getElementById('ncP').value||'',auto:!!NC.auto,
-  destino:NC.auto?NC.destino:null,formaHab:NC.auto?null:(fh?fh.value:'Débito'),
-  dur:NC.dur==='ind'?'ind':NC.durN,inicio:ini,fim:fim,ativa:true};
+ const pj=document.getElementById('ncP');
+ const obj={nome,valor,dia,tipo:NC.tipo,classe:g?'fixa':NC.classe,
+  cat:document.getElementById('ncC').value,
+  quem:g?NC.quem:null,proj:(!g&&pj)?pj.value:'',auto:g?false:!!NC.auto,
+  destino:(!g&&NC.auto)?NC.destino:null,formaHab:(g||NC.auto)?null:(fh?fh.value:'Débito'),
+  dur:'ind',inicio:ini,fim:fim,ativa:true};
  if(NC.id){
   const c=D.contas.find(x=>x.id===NC.id);
   const antes=valorEm(c,anoAtivo,mesAtivo);
