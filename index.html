@@ -415,6 +415,17 @@ function migrarValores(){
  });
  if(mudou)salvar();
 }
+/* texto da vigência: usa a data de fim, não o antigo campo de duração */
+function textoVigencia(c){
+ if(!c.fim)return'sem prazo';
+ const[a,m]=c.fim.split('-').map(Number);
+ const hj=new Date(),k=chaveMes(hj.getFullYear(),hj.getMonth());
+ const falta=(a-hj.getFullYear())*12+(m-1-hj.getMonth());
+ if(c.fim<k)return'terminou em '+MESES[m-1].toLowerCase()+'/'+String(a).slice(2);
+ if(falta<=0)return'último mês';
+ return'até '+MESES[m-1].toLowerCase()+'/'+String(a).slice(2)+' · faltam '+falta+' meses';
+}
+
 /* contas chegando ao fim da vigência */
 function contasVencendo(){
  const hj=new Date(),k=chaveMes(hj.getFullYear(),hj.getMonth());
@@ -666,8 +677,8 @@ function telaContas(){
  ${ft?`<div class="lbl">FATURAS DE CARTÃO (${D.cartoes.length})</div><div class="sec">${ft}</div>`:''}
  ${ass.length?`<div style="margin:12px 16px 0;padding:11px 12px;background:var(--pl);border-radius:12px;display:flex;
   align-items:center;gap:9px;cursor:pointer" onclick="go('assin')">
-  <div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#3C3489">${ass.length} assinaturas · ${brl(vAss)}/mês</div>
-  <div style="font-size:10.5px;color:var(--p)">caem sozinhas, sem você confirmar</div></div>
+  <div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#3C3489">${ass.length} ${ass.length>1?'débitos automáticos':'débito automático'} · ${brl(vAss)}/mês</div>
+  <div style="font-size:10.5px;color:var(--p)">caem sozinhos, sem você confirmar</div></div>
   <div style="font-size:16px;color:var(--p)">›</div></div>`:''}
  <div class="note" style="padding:12px 16px">Pagar a fatura não cria gasto novo — as compras já foram contadas quando aconteceram.</div>
  <button class="btn gh" onclick="novaConta()">+ Nova conta</button>
@@ -730,7 +741,7 @@ function telaMais(){
  document.getElementById('p-mais').innerHTML=`
  <div class="lbl">CONSULTAR</div>
  <div class="mrow" onclick="go('invest')"><div class="n">Investimentos e patrimônio</div><div class="c">›</div></div>
- <div class="mrow" onclick="go('assin')"><div class="n">Assinaturas</div><span class="bdg">${na}</span><div class="c">›</div></div>
+ <div class="mrow" onclick="go('assin')"><div class="n">Débitos automáticos</div><span class="bdg">${na}</span><div class="c">›</div></div>
  <div class="mrow" onclick="go('lembretes')"><div class="n">Lembretes</div><div class="c">›</div></div>
  <div class="lbl">CONFIGURAR</div>
  <div class="mrow" onclick="go('metas')"><div class="n">Metas</div><div class="c">›</div></div>
@@ -754,7 +765,7 @@ function go(p,el){
  if(el){document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));el.classList.add('on')}
  secAtual=p;
  const T={home:'Finanças',contas:'Contas',analise:'Análise',mais:'Mais',invest:'Investimentos',
-  assin:'Assinaturas',lembretes:'Lembretes',metas:'Metas',atalhos:'Meus atalhos',
+  assin:'Débitos automáticos',lembretes:'Lembretes',metas:'Metas',atalhos:'Meus atalhos',
   cadcontas:'Contas cadastradas',cadcards:'Cartões',cats:'Categorias',dados:'Backup e dados',nuvem:'Nuvem'};
  document.getElementById('ttl').textContent=T[p]||'Finanças';
  document.getElementById('main').scrollTop=0;
@@ -1187,23 +1198,23 @@ function telaAssin(){
   sub.forEach(c=>h+=`<div class="row" style="cursor:pointer" onclick="verAssin('${c.id}')">
    <span style="font-size:13px;color:var(--p);width:12px;text-align:center">↻</span>
    <div class="g"><div class="n">${c.nome}</div>
-   <div class="m">dia ${c.dia} · ${c.dur==='ind'?'indeterminada':'até '+c.dur+' meses'}</div></div>
+   <div class="m">dia ${c.dia} · ${textoVigencia(c)}</div></div>
    <div class="v">${brl(c.valor)}</div><span style="font-size:16px;color:var(--t3)">›</span></div>`);
   h+='</div>';
  });
  document.getElementById('p-assin').innerHTML=`
  ${at.length?`<div class="hero" style="background:var(--pl);color:#2b2470">
-  <div class="k">VOCÊS PAGAM POR MÊS</div><div class="v">${brl(mm)}</div>
-  <div class="s">${brl(mm*12)} por ano · ${at.length} ativas</div></div>
-  <div class="lbl">EM QUE ELAS SE TRANSFORMAM</div>${cg}
-  <div class="note" style="padding:0 16px 4px">Cada uma tem a categoria do que ela é. Na Análise cada uma soma na sua categoria.</div>${h}`
-  :'<div class="empty">Nenhuma assinatura.<br>Assinatura é uma conta que cai sozinha —<br>marque "automática" ao cadastrar.</div>'}
- ${can.length?`<div class="lbl">CANCELADAS (${can.length})</div><div class="sec">${can.map(c=>
+  <div class="k">SAI SOZINHO POR MÊS</div><div class="v">${brl(mm)}</div>
+  <div class="s">${brl(mm*12)} por ano · ${at.length} lançamento${at.length>1?'s':''} automático${at.length>1?'s':''}</div></div>
+  <div class="lbl">EM QUE ISSO SE TRANSFORMA</div>${cg}
+  <div class="note" style="padding:0 16px 4px">Streaming, empréstimo em débito automático, mensalidade — tudo que é cobrado sem você fazer nada. Na Análise cada um soma na sua categoria.</div>${h}`
+  :'<div class="empty">Nada cai sozinho ainda.<br>Marque "automática" ao cadastrar uma conta<br>que é debitada sem você confirmar.</div>'}
+ ${can.length?`<div class="lbl">DESLIGADOS (${can.length})</div><div class="sec">${can.map(c=>
   `<div class="row" style="cursor:pointer" onclick="verAssin('${c.id}')">
    <span style="font-size:13px;color:var(--t3);width:12px;text-align:center">×</span>
    <div class="g"><div class="n" style="color:var(--t3);text-decoration:line-through">${c.nome}</div>
-   <div class="m">era ${brl(c.valor)}/mês</div></div><span style="font-size:16px;color:var(--t3)">›</span></div>`).join('')}</div>`:''}
- <button class="btn" onclick="novaAssinatura()">+ Nova assinatura</button>`;
+   <div class="m">era ${brl(c.valor)}/mês${c.cat?' · '+c.cat:''}</div></div><span style="font-size:16px;color:var(--t3)">›</span></div>`).join('')}</div>`:''}
+ <button class="btn" onclick="novaAssinatura()">+ Novo débito automático</button>`;
 }
 
 function telaLembretes(){
@@ -1304,7 +1315,7 @@ function telaCadContas(){
  <div class="sec">${man.map(c=>{const vr=variacao(c);
   return `<div class="row" style="cursor:pointer" onclick="verConta('${c.id}')">
   <div class="g"><div class="n">${c.nome}</div>
-  <div class="m">${c.tipo==='ganho'?'Ganho':(c.classe==='fixa'?'Fixa':'Variável')} · dia ${c.dia} · ${c.cat}${c.fim?' · até '+c.fim:''}${vr?' · subiu '+vr.pct.toFixed(0)+'%':''}</div></div>
+  <div class="m">${c.tipo==='ganho'?'Entrada':(c.classe==='fixa'?'Fixa':'Variável')}${c.auto?' · automática':''} · dia ${c.dia} · ${c.cat}${c.fim?' · '+textoVigencia(c):''}${vr?' · subiu '+vr.pct.toFixed(0)+'%':''}</div></div>
   <div class="v" style="color:var(--t2)">${brl(valorEm(c,anoAtivo,mesAtivo))}</div><span style="color:var(--t3)">›</span></div>`}).join('')
   ||'<div class="empty">Nenhuma conta cadastrada</div>'}</div>
  <button class="btn" onclick="novaConta()">+ Nova conta</button>`;
@@ -1385,7 +1396,7 @@ function verFatura(id){
  ass.forEach(c=>h+=`<div class="row" onclick="verAssin('${c.id}')" style="cursor:pointer">
   <span style="font-size:13px;color:var(--p);width:12px;text-align:center">↻</span>
   <div class="g"><div class="n">${c.nome}</div>
-  <div class="m" style="color:var(--p)">assinatura · dia ${c.dia} · ${c.dur==='ind'?'indeterminada':c.dur+' meses'}</div></div>
+  <div class="m" style="color:var(--p)">automático · dia ${c.dia} · ${textoVigencia(c)}</div></div>
   <div class="v">${brl(valorDoMes(c))}</div></div>`);
  compras.forEach(l=>h+=`<div class="row" onclick="verLanc('${l.id}')" style="cursor:pointer">
   <span class="dot" style="background:var(--b)"></span>
@@ -1499,23 +1510,23 @@ function verAssin(id){
  document.getElementById('genT').textContent=c.nome;
  document.getElementById('genB').innerHTML=`
   <div class="hero" style="background:${viva?'var(--pl)':'var(--s1)'};color:${viva?'#2b2470':'var(--t3)'}">
-   <div class="k">${viva?'POR MÊS':'CANCELADA'}</div><div class="v">${brl(c.valor)}</div>
+   <div class="k">${viva?'POR MÊS':'DESLIGADO'}</div><div class="v">${brl(c.valor)}</div>
    <div class="s">${brl(c.valor*12)} por ano</div></div>
   <div class="sec" style="padding-top:6px">
    <div class="row"><div class="g"><div class="n">Onde cai</div></div><div class="v">${c.destino?nomeCard(c.destino):'Débito em conta'}</div></div>
    <div class="row"><div class="g"><div class="n">Cobra dia</div></div><div class="v">${c.dia}</div></div>
-   <div class="row"><div class="g"><div class="n">Duração</div></div><div class="v">${c.dur==='ind'?'indeterminada':c.dur+' meses'}</div></div>
+   <div class="row"><div class="g"><div class="n">Vigência</div></div><div class="v">${textoVigencia(c)}</div></div>
    <div class="row"><div class="g"><div class="n">Categoria</div></div><div class="v">${c.cat}</div></div></div>
   <button class="btn gh" onclick="fecha('sh-gen');editarConta('${c.id}')">Editar</button>
-  ${viva?`<button class="btn dz" onclick="cancelarAssin('${c.id}')">Cancelar assinatura</button>
-   <div class="note">Para de cair a partir do mês que vem. O histórico continua.</div>`
-  :`<button class="btn" onclick="reativarAssin('${c.id}')">Reativar</button>`}`;
+  ${viva?`<button class="btn dz" onclick="cancelarAssin('${c.id}')">Desligar</button>
+   <div class="note">Para de cair a partir do mês que vem. O histórico continua inteiro.</div>`
+  :`<button class="btn" onclick="reativarAssin('${c.id}')">Religar</button>`}`;
  abre('sh-gen');
 }
 function cancelarAssin(id){
  const c=D.contas.find(x=>x.id===id);
- if(!confirm('Cancelar '+c.nome+'?'))return;
- c.ativa=false;salvar();fecha('sh-gen');render();tst(c.nome+' cancelada · '+brl(c.valor)+'/mês a menos');
+ if(!confirm('Desligar '+c.nome+'? Ele para de cair a partir do mês que vem.'))return;
+ c.ativa=false;subir('contas',c);salvar();fecha('sh-gen');render();tst(c.nome+' desligado · '+brl(c.valor)+'/mês a menos');
 }
 function reativarAssin(id){
  const c=D.contas.find(x=>x.id===id);c.ativa=true;salvar();fecha('sh-gen');render();tst(c.nome+' reativada');
@@ -1595,7 +1606,7 @@ function editarConta(id){
 function abrirFormConta(c){
  NC.c=c||null;
  document.getElementById('ncT').textContent=c?(NC.tipo==='ganho'?'Editar entrada':'Editar conta')
-  :(NC.auto?'Nova assinatura':(NC.tipo==='ganho'?'Nova entrada':'Nova conta'));
+  :(NC.auto?'Novo débito automático':(NC.tipo==='ganho'?'Nova entrada':'Nova conta'));
  dForm();
  abre('sh-conta');
 }
@@ -1714,7 +1725,7 @@ function salvarConta(){
   subir('contas',c);tst(nome+' atualizada');
  } else {
   obj.id=novoId();obj.valores=[{desde:ini,valor}];
-  D.contas.push(obj);subir('contas',obj);tst(NC.auto?'Assinatura criada':(NC.tipo==='ganho'?'Entrada cadastrada':'Conta cadastrada'));
+  D.contas.push(obj);subir('contas',obj);tst(NC.auto?'Débito automático criado':(NC.tipo==='ganho'?'Entrada cadastrada':'Conta cadastrada'));
  }
  salvar();fecha('sh-conta');render();
  if(NC.auto)go('assin');
