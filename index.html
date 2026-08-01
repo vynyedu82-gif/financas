@@ -267,7 +267,7 @@ border-radius:10px;font-size:14px;font-family:inherit;color:var(--t);background:
    ══════════════════════════════════════════════════════════ */
 const CATS=['Moradia','Casa','Mercado','Comer fora','Delivery','Lazer','Saídas','Transporte','Saúde',
 'Seguro','Educação','Atividades físicas','Cuidados pessoais','Vestuário','Tecnologia','Presentes','Pet',
-'Doações','Família Vinicius','Família Tânia','Empréstimo que pago','Empréstimo que fiz a alguém',
+'Doações','Família Vinicius pai','Família Vinicius mãe','Família Tânia','Empréstimo que pago','Empréstimo que fiz a alguém',
 'Financiamentos','Tarifas bancárias','Impostos e taxas','Outros'];
 const FORMAS=['Débito','Crédito','Dinheiro','Pix','Pix c/ juros','Empréstimo'];
 const FONTES=['Salário','Freelance','Reembolso','PLR','13º salário','Férias','Comissão','Presente',
@@ -407,6 +407,17 @@ function reajustar(c,v,desde){
  c.valor=valorEm(c,new Date().getFullYear(),new Date().getMonth());
  delete (D.ajustes||{})[desde+'|'+c.id];
 }
+/* migração: "Família Vinicius" foi dividida em pai e mãe */
+function migrarCategorias(){
+ const de='Família Vinicius', para='Família Vinicius pai';
+ let n=0;
+ D.contas.forEach(c=>{if(c.cat===de){c.cat=para;n++;subir&&subir('contas',c)}});
+ D.lanc.forEach(l=>{if(l.cat===de){l.cat=para;n++}});
+ D.atalhosG.forEach(a=>{if(a.cat===de)a.cat=para});
+ if(n){salvar();console.log('categorias migradas:',n)}
+ return n;
+}
+
 /* migração: conta antiga com valor único vira um degrau */
 function migrarValores(){
  let mudou=false;
@@ -2231,6 +2242,7 @@ if(!D.baixas)D.baixas={};
 if(!D.ajustes)D.ajustes={};
 if(!D.lembretes)D.lembretes=[];
 migrarValores();
+migrarCategorias();
 render();
 if(cfgNuvem())conectarNuvem(true);
 if(!tinha)go('home');
