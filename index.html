@@ -651,47 +651,80 @@ function telaContas(){
  const man=contasManuais().filter(c=>c.tipo!=='ganho');
  const ent=contasManuais().filter(c=>c.tipo==='ganho');
  const fx=man.filter(c=>c.classe==='fixa'),vr=man.filter(c=>c.classe==='var');
- const ass=assinaturas(),vAss=ass.reduce((s,c)=>s+valorDoMes(c),0);
- if(!man.length&&!D.cartoes.length&&!ass.length){
-  el.innerHTML='<div class="empty">Nenhuma conta cadastrada</div><button class="btn" onclick="novaConta()">+ Nova conta</button>';
+ const ass=assinaturas();
+ if(!man.length&&!D.cartoes.length&&!ass.length&&!ent.length){
+  el.innerHTML='<div class="empty">Nenhuma conta cadastrada</div>'
+   +'<button class="btn" onclick="novaEntrada()">+ Nova entrada</button>'
+   +'<button class="btn gh" onclick="novaConta()">+ Nova conta</button>';
   return;
  }
- const lin=(c,ed)=>{
+ const soma=a=>a.reduce((s,c)=>s+valorDoMes(c),0);
+ const abertas=a=>a.filter(c=>!paga(c)).length;
+
+ const cab=(k,titulo,sub,total,cor)=>`
+  <div onclick="toggleSec('${k}')" style="display:flex;align-items:center;gap:10px;padding:13px 16px;
+   border-bottom:1px solid var(--bd);cursor:pointer;background:${SEC[k]?'var(--s1)':'var(--s)'}">
+   <span style="font-size:13px;color:var(--t3);width:12px;transition:.2s;display:inline-block;
+    transform:rotate(${SEC[k]?'90':'0'}deg)">▸</span>
+   <div style="flex:1"><div style="font-size:13.5px;font-weight:600">${titulo}</div>
+    <div style="font-size:10.5px;color:var(--t3)">${sub}</div></div>
+   <div style="font-size:13.5px;font-weight:700;color:${cor}">${brl(total)}</div></div>`;
+
+ const lin=c=>{
   const pgo=paga(c),d=diasAte(c.dia),late=d<0&&!pgo&&mesCorrente();
   return `<div class="row ${pgo?'done':''}">
    <button class="ck ${pgo?'on':''} ${late?'due':''}" onclick="darBaixa('${c.id}')"></button>
-   <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
-    <div class="m" ${late?'style="color:var(--r)"':''}>${pgo?'pago'+(baixa(c.id).forma?' · '+baixa(c.id).forma:''):(late?'venceu há '+(-d)+'d':'dia '+c.dia)}${c.proj?' · '+c.proj:''}</div></div>
+   <div class="g" onclick="verConta('${c.id}')"><div class="n">${c.nome}</div>
+    <div class="m" ${late?'style="color:var(--r)"':''}>${pgo?'pago'+(baixa(c.id).forma?' · '+baixa(c.id).forma:''):(late?'venceu há '+(-d)+'d':(d===0?'vence hoje':'dia '+c.dia))}${c.proj?' · '+c.proj:''}</div></div>
    ${!pgo?`<input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
-     onchange="mudouValor('${c.id}',this.value)">`
-    :`<div class="v">${brl(valorDoMes(c))}</div>`}</div>`};
- let ft='';
+     onchange="mudouValor('${c.id}',this.value)">`:`<div class="v">${brl(valorDoMes(c))}</div>`}</div>`};
+
+ const linEnt=c=>`<div class="row"><span class="dot" style="background:var(--g)"></span>
+   <div class="g" onclick="verConta('${c.id}')"><div class="n">${c.nome}</div>
+   <div class="m">${c.quem||''}${c.cat?' · '+c.cat:''} · cai dia ${c.dia}</div></div>
+   <input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
+    onchange="mudouValor('${c.id}',this.value)"></div>`;
+
+ let cart='';
  D.cartoes.forEach(k=>{
   const v=faturaDoCartao(k.id),pgo=faturaPaga(k.id),na=assinDoCartao(k.id).length;
   const nc=gastosDoMes().filter(l=>l.cartao===k.id).length;
-  ft+=`<div class="row ${pgo?'done':''}">
+  cart+=`<div class="row ${pgo?'done':''}">
    <button class="ck ${pgo?'on':''}" onclick="pagarFatura('${k.id}')"></button>
    <div class="g" onclick="verFatura('${k.id}')"><div class="n">${k.nome}</div>
-    <div class="m">vence dia ${k.venc}${nc?' · '+nc+' compra'+(nc>1?'s':''):''}${na?' · '+na+' assinatura'+(na>1?'s':''):''}</div></div>
+    <div class="m">vence dia ${k.venc}${nc?' · '+nc+' compra'+(nc>1?'s':''):''}${na?' · '+na+' automático'+(na>1?'s':''):''}</div></div>
    <div class="v" onclick="verFatura('${k.id}')">${brl(v)} ›</div></div>`});
+ const totCart=D.cartoes.reduce((s,k)=>s+faturaDoCartao(k.id),0);
+ const cartAbertas=D.cartoes.filter(k=>!faturaPaga(k.id)).length;
+
  el.innerHTML=`
- <div style="padding:14px 16px 0"><div style="font-size:12px;color:var(--t2)">
-  Falta pagar <b style="color:var(--r);font-size:14px">${brl(aindaSai())}</b></div></div>
- ${ent.length?`<div class="lbl">ENTRADAS DO MÊS (${ent.length})</div><div class="sec">${ent.map(c=>
-  `<div class="row"><span class="dot" style="background:var(--g)"></span>
-   <div class="g" onclick="editarConta('${c.id}')"><div class="n">${c.nome}</div>
-   <div class="m">${c.quem||''}${c.cat?' · '+c.cat:''} · cai dia ${c.dia}</div></div>
-   <input class="vin" type="text" inputmode="decimal" value="${valorDoMes(c).toFixed(2).replace('.',',')}"
-    onchange="mudouValor('${c.id}',this.value)"></div>`).join('')}</div>`:''}
- ${fx.length?`<div class="lbl">FIXAS · confirma (${fx.length})</div><div class="sec">${fx.map(c=>lin(c,0)).join('')}</div>`:''}
- ${vr.length?`<div class="lbl">VARIÁVEIS · confere o valor (${vr.length})</div><div class="sec">${vr.map(c=>lin(c,1)).join('')}</div>`:''}
- ${ft?`<div class="lbl">FATURAS DE CARTÃO (${D.cartoes.length})</div><div class="sec">${ft}</div>`:''}
- ${ass.length?`<div style="margin:12px 16px 0;padding:11px 12px;background:var(--pl);border-radius:12px;display:flex;
-  align-items:center;gap:9px;cursor:pointer" onclick="go('assin')">
-  <div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#3C3489">${ass.length} ${ass.length>1?'débitos automáticos':'débito automático'} · ${brl(vAss)}/mês</div>
-  <div style="font-size:10.5px;color:var(--p)">caem sozinhos, sem você confirmar</div></div>
-  <div style="font-size:16px;color:var(--p)">›</div></div>`:''}
- <div class="note" style="padding:12px 16px">Pagar a fatura não cria gasto novo — as compras já foram contadas quando aconteceram.</div>
+ <div style="padding:14px 16px 10px;display:flex;justify-content:space-between;align-items:baseline">
+  <span style="font-size:12px;color:var(--t2)">Falta pagar</span>
+  <span style="font-size:19px;font-weight:700;color:var(--r)">${brl(aindaSai())}</span></div>
+
+ ${ent.length?cab('ent','Entradas do mês',ent.length+(ent.length>1?' fontes':' fonte'),soma(ent),'var(--g)')
+  +(SEC.ent?`<div class="sec">${ent.map(linEnt).join('')}</div>`:''):''}
+
+ ${fx.length?cab('fix','Contas fixas',abertas(fx)?abertas(fx)+' em aberto de '+fx.length:'todas pagas',soma(fx),abertas(fx)?'var(--r)':'var(--t3)')
+  +(SEC.fix?`<div class="sec">${fx.map(lin).join('')}</div>
+   <div class="note" style="padding:8px 16px 12px">Valor igual todo mês. Se mudou, o app pergunta se é reajuste.</div>`:''):''}
+
+ ${vr.length?cab('var','Contas variáveis',abertas(vr)?abertas(vr)+' em aberto de '+vr.length:'todas pagas',soma(vr),abertas(vr)?'var(--r)':'var(--t3)')
+  +(SEC.var?`<div class="sec">${vr.map(lin).join('')}</div>
+   <div class="note" style="padding:8px 16px 12px">Confira o valor que veio antes de confirmar.</div>`:''):''}
+
+ ${D.cartoes.length?cab('cart','Cartões',cartAbertas?cartAbertas+' fatura'+(cartAbertas>1?'s':'')+' em aberto':'faturas pagas',totCart,cartAbertas?'var(--r)':'var(--t3)')
+  +(SEC.cart?`<div class="sec">${cart}</div>
+   <div class="note" style="padding:8px 16px 12px">Pagar a fatura não cria gasto novo — as compras já foram contadas quando aconteceram.</div>`:''):''}
+
+ ${ass.length?cab('auto','Débitos automáticos',ass.length+' sem precisar confirmar',soma(ass),'var(--p)')
+  +(SEC.auto?`<div class="sec">${ass.map(c=>`<div class="row" onclick="verAssin('${c.id}')" style="cursor:pointer">
+    <span style="font-size:13px;color:var(--p);width:12px;text-align:center">↻</span>
+    <div class="g"><div class="n">${c.nome}</div>
+    <div class="m">${c.destino?nomeCard(c.destino):'débito em conta'} · dia ${c.dia}</div></div>
+    <div class="v">${brl(valorDoMes(c))}</div><span style="color:var(--t3)">›</span></div>`).join('')}</div>`:''):''}
+
+ <div style="height:10px"></div>
  <button class="btn gh" onclick="novaConta()">+ Nova conta</button>
  <button class="btn gh" style="margin-top:0" onclick="novaEntrada()">+ Nova entrada (salário)</button>`;
 }
@@ -1964,6 +1997,10 @@ function exemplo(){
      casas/{casa}/meses/{AAAA-MM} → baixas e ajustes do mês
    ══════════════════════════════════════════════════════════ */
 const NUV_CFG='ff.nuvem';
+const SEC_KEY='ff.secoes';
+let SEC=(()=>{try{return JSON.parse(localStorage.getItem(SEC_KEY))||{}}catch(e){return{}}})();
+if(SEC.ent===undefined)SEC={ent:0,fix:1,var:1,cart:1,auto:0};
+function toggleSec(k){SEC[k]=SEC[k]?0:1;localStorage.setItem(SEC_KEY,JSON.stringify(SEC));render()}
 let FB=null, nuvem={ligada:false,user:null,casa:null,estado:'off',erro:null,ouvindo:[]};
 
 function cfgNuvem(){try{return JSON.parse(localStorage.getItem(NUV_CFG))||null}catch(e){return null}}
